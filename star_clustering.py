@@ -49,6 +49,7 @@ class StarCluster(object):
         empty_clusters = []
         mindex = 0
         self.labels_ = np.zeros(n, dtype='int32') - 1
+        self.ulabels = np.zeros(n, dtype='int32')
         mass = np.zeros(n, dtype='float32')
         while np.mean(mass) <= limit:
             i, j, distance = distances_list[mindex]
@@ -81,29 +82,46 @@ class StarCluster(object):
             mass[i] -= distance
             mass[mindex] -= distance
 
-        # Set Threshold Based On Average Modified By Deviation Reduced By Constant of Proportionality
-        threshold = np.mean(mass) - np.std(mass) / golden_ratio
+            # Set Threshold Based On Average Modified By Deviation Reduced By Constant of Proportionality
+            threshold = np.mean(mass) - np.std(mass) / golden_ratio
+            uthreshold = np.mean(mass) + np.std(mass) / golden_ratio
 
-        # Disconnect Lower Mass Nodes
-        for i in range(n):
-            if mass[i] <= threshold:
-                self.labels_[i] = -1
+            # Disconnect Lower Mass Nodes
+            for i in range(n):
+                if mass[i] <= threshold:
+                    self.labels_[i] = -1
+                # mark nodes with mass above upper threshold to be skipped
+                if mass[i] >= uthreshold:
+                    self.ulabels[i] = -1
 
-        # Ignore Masses of Nodes In Clusters Now
-        mass[self.labels_ != -1] = -np.inf
+            # Ignore Masses of Nodes In Clusters Now
+            mass[self.labels_ != -1] = -np.inf
+            acount = 0
+            # Go Through Disconnected Nodes From Highest To Lowest Mass And Reconnect To Nearest Neighbour That Hasn't Already Connected To It Earlier
+            while -1 in self.labels_:
+                i = np.argmax(mass)
+                mindex = i
+                while self.labels_[mindex] == -1:
+                    # argsort returns ordered list of nearest indexes (low -> high)
+                    dsorted = np.argsort(distances_matrix[i])
+                    not_connected = True
 
-        # Go Through Disconnected Nodes From Highest To Lowest Mass And Reconnect To Nearest Neighbour That Hasn't Already Connected To It Earlier
-        while -1 in self.labels_:
-            i = np.argmax(mass)
-            mindex = i
-            while self.labels_[mindex] == -1:
-                mindex = np.argmin(distances_matrix[i])
-                distance = distances_matrix[i, mindex]
-                distances_matrix[i, mindex] = np.inf
-            self.labels_[i] = self.labels_[mindex]
-            mass[i] = -np.inf
+                    # sidx determines how deep into argsort list to go due to skipped high mass nodes
+                    sidx = 0
+                    while not_connected:
+                        cidx = dsorted[sidx]
+                        if self.ulabels[cidx] == -1:
+                            acount += 1
+                            sidx += 1
+                        else:
+                            mindex = cidx
+                            not_connected = False
+                    distances_matrix[i, mindex] = np.inf
+                self.labels_[i] = self.labels_[mindex]
+                mass[i] = -np.inf
 
-        return self
+            print('Connections to nodes above upper mass threshold skipped: {}'.format(acount))
+            return self
 
     def predict(self, X):
         self.fit(X)
