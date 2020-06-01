@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import numpy as np
+from distances import Angular, Euclidean
+
 
 class StarCluster(object):
     """Star Clustering Algorithm"""
-    
-    def fit(self, X):
+
+    def fit(self, X, upper=False, limit_exp=1, dis_type='euclidean'):
         # Set Constant of Proportionality
         golden_ratio = ((1.0 + (5.0 ** 0.5)) / 2.0)
         # Number of Nodes
@@ -25,15 +27,16 @@ class StarCluster(object):
         # Number of Features
         d = X.shape[1]
 
+        if dis_type == 'angular':
+            dis_class = Angular
+        else:
+            dis_class = Euclidean
+
         # Construct Node-To-Node Matrix of Distances
-        distances_matrix = np.zeros((n, n, d), dtype='float32')
-        for i in range(n):
-            for j in range(n):
-                distances_matrix[i, j] = X[i] - X[j]
-        distances_matrix = np.linalg.norm(distances_matrix, axis=-1)
+        distances_matrix = dis_class.calc(X)
 
         # Determine Average Distance And Extend By Constant of Proportionality To Set Limit
-        limit = np.sum(distances_matrix) / (n * n - n) * golden_ratio
+        limit = np.sum(distances_matrix) / (n * n - n) * golden_ratio ** limit_exp
 
         # Construct List of Distances Less Than Limit
         distances_list = []
@@ -49,7 +52,8 @@ class StarCluster(object):
         empty_clusters = []
         mindex = 0
         self.labels_ = np.zeros(n, dtype='int32') - 1
-        self.ulabels = np.zeros(n, dtype='int32')
+        if upper:
+            self.ulabels = np.zeros(n, dtype='int32')
         mass = np.zeros(n, dtype='float32')
         while np.mean(mass) <= limit:
             i, j, distance = distances_list[mindex]
@@ -82,31 +86,30 @@ class StarCluster(object):
             mass[i] -= distance
             mass[mindex] -= distance
 
-            # Set Threshold Based On Average Modified By Deviation Reduced By Constant of Proportionality
-            threshold = np.mean(mass) - np.std(mass) / golden_ratio
-            uthreshold = np.mean(mass) + np.std(mass) / golden_ratio
+        # Set Threshold Based On Average Modified By Deviation Reduced By Constant of Proportionality
+        threshold = np.mean(mass) - np.std(mass) / golden_ratio
 
-            # Disconnect Lower Mass Nodes
+        # Disconnect Lower Mass Nodes
+        for i in range(n):
+            if mass[i] <= threshold:
+                self.labels_[i] = -1
+        if upper:
+            uthreshold = np.mean(mass) + np.std(mass) / golden_ratio
             for i in range(n):
-                if mass[i] <= threshold:
-                    self.labels_[i] = -1
-                # mark nodes with mass above upper threshold to be skipped
                 if mass[i] >= uthreshold:
                     self.ulabels[i] = -1
 
-            # Ignore Masses of Nodes In Clusters Now
-            mass[self.labels_ != -1] = -np.inf
-            acount = 0
-            # Go Through Disconnected Nodes From Highest To Lowest Mass And Reconnect To Nearest Neighbour That Hasn't Already Connected To It Earlier
-            while -1 in self.labels_:
-                i = np.argmax(mass)
-                mindex = i
+        # Ignore Masses of Nodes In Clusters Now
+        mass[self.labels_ != -1] = -np.inf
+        acount = 0
+        # Go Through Disconnected Nodes From Highest To Lowest Mass And Reconnect To Nearest Neighbour That Hasn't Already Connected To It Earlier
+        while -1 in self.labels_:
+            i = np.argmax(mass)
+            mindex = i
+            if upper:
                 while self.labels_[mindex] == -1:
-                    # argsort returns ordered list of nearest indexes (low -> high)
                     dsorted = np.argsort(distances_matrix[i])
                     not_connected = True
-
-                    # sidx determines how deep into argsort list to go due to skipped high mass nodes
                     sidx = 0
                     while not_connected:
                         cidx = dsorted[sidx]
@@ -117,11 +120,17 @@ class StarCluster(object):
                             mindex = cidx
                             not_connected = False
                     distances_matrix[i, mindex] = np.inf
-                self.labels_[i] = self.labels_[mindex]
-                mass[i] = -np.inf
+            else:
+                while self.labels_[mindex] == -1:
+                    mindex = np.argmin(distances_matrix[i])
+                    distance = distances_matrix[i, mindex]
+                    distances_matrix[i, mindex] = np.inf
+            self.labels_[i] = self.labels_[mindex]
+            mass[i] = -np.inf
 
+        if upper:
             print('Connections to nodes above upper mass threshold skipped: {}'.format(acount))
-            return self
+        return self
 
     def predict(self, X):
         self.fit(X)

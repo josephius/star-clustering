@@ -1,2 +1,3 @@
 .idea
 *.vec
+__pycache__
