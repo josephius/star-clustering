@@ -32,7 +32,7 @@ Three test scripts are provided that are meant to show the effectiveness of the 
 * word_vectors_test.py
 * plot_cluster_iris.py
 
-Note that the word vectors test requires a copy of the FastText pretrained word vectors or some equivalent, which is not provided here.
+Note that the word vectors test requires a copy of the FastText pretrained word vectors or some equivalent, which is not provided here. (https://fasttext.cc/docs/en/english-vectors.html)
 
 ## Example Plot Results
 
