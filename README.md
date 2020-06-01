@@ -60,7 +60,7 @@ Note that the word vectors test requires a copy of the FastText pretrained word 
 * optional limit_exp argument added to the StarCluster.fit() method to allow for scaling of the constant used in calculating the limit value
 * optional upper threshold added that prevents connections from being made to nodes above a certain mass added in an attempt to (very) roughly emulate golden section search
 * new features were (hopefully) added in a way that everything should work identically to the original code if default arguments are sent to the Starcluster.fit() method
-* basic_english_upper_angular_centered_lim0p618.txt contains results of word clustering with arguments of fit(vectors, upper=True, limit_exp=-1, dis_type='angular')
+* **basic_english_upper_angular_centered_lim0p618.txt** contains results of word clustering with arguments of fit(vectors, upper=True, limit_exp=-1, dis_type='angular')
 
 
 
