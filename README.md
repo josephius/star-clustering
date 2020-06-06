@@ -9,6 +9,7 @@ The Star Clustering algorithm is a clustering technique that is loosely inspired
 The following dependencies should be installed:
 
 * numpy
+* scipy
 
 ## Setup
 
@@ -62,7 +63,12 @@ Note that the word vectors test requires a copy of the FastText pretrained word 
 * new features were (hopefully) added in a way that everything should work identically to the original code if default arguments are sent to the Starcluster.fit() method
 * **basic_english_upper_angular_centered_lim0p618.txt** contains results of word clustering with arguments of fit(vectors, upper=True, limit_exp=-1, dis_type='angular')
 
+## Refactoring Update
 
+* switched to using the pdist class from scipy for distance metrics
+* changed hyperparameter names to be a bit more verbose but clearer
+* allow the constant factors to take any float value
+* added a verbose debugging flag
 
 ## License
 
