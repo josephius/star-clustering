@@ -13,30 +13,43 @@
 # limitations under the License.
 
 import numpy as np
-from distances import Angular, Euclidean
-
+from scipy.spatial.distance import pdist, squareform
 
 class StarCluster(object):
     """Star Clustering Algorithm"""
-
-    def fit(self, X, upper=False, limit_exp=1, dis_type='euclidean'):
+    def __init__(self, has_upper_cutoff=False, limit_factor='golden_ratio', threshold_factor='golden_ratio_conjugate', distance_type='euclidean', debug=False):
+        self.has_upper_cutoff = has_upper_cutoff
         # Set Constant of Proportionality
-        golden_ratio = ((1.0 + (5.0 ** 0.5)) / 2.0)
+        if limit_factor == 'golden_ratio':
+            self.limit_factor = ((1.0 + (5.0 ** 0.5)) / 2.0)
+        elif limit_factor == 'golden_ratio_conjugate':
+            self.limit_factor = ((1.0 + (5.0 ** 0.5)) / 2.0) - 1.0
+        elif isinstance(limit_factor, float):
+            self.limit_factor = limit_factor
+        else:
+            raise
+        if threshold_factor == 'golden_ratio':
+            self.threshold_factor = ((1.0 + (5.0 ** 0.5)) / 2.0)
+        elif threshold_factor == 'golden_ratio_conjugate':
+            self.threshold_factor = ((1.0 + (5.0 ** 0.5)) / 2.0) - 1.0
+        elif isinstance(threshold_factor, float):
+            self.threshold_factor = threshold_factor
+        else:
+            raise
+        self.distance_type = distance_type
+        self.debug = debug
+
+    def fit(self, X):
         # Number of Nodes
         n = X.shape[0]
         # Number of Features
         d = X.shape[1]
 
-        if dis_type == 'angular':
-            dis_class = Angular
-        else:
-            dis_class = Euclidean
-
         # Construct Node-To-Node Matrix of Distances
-        distances_matrix = dis_class.calc(X)
+        distances_matrix = squareform(pdist(X, self.distance_type))
 
         # Determine Average Distance And Extend By Constant of Proportionality To Set Limit
-        limit = np.sum(distances_matrix) / (n * n - n) * golden_ratio ** limit_exp
+        limit = np.sum(distances_matrix) / (n * n - n) * self.limit_factor
 
         # Construct List of Distances Less Than Limit
         distances_list = []
@@ -52,7 +65,7 @@ class StarCluster(object):
         empty_clusters = []
         mindex = 0
         self.labels_ = np.zeros(n, dtype='int32') - 1
-        if upper:
+        if self.has_upper_cutoff:
             self.ulabels = np.zeros(n, dtype='int32')
         mass = np.zeros(n, dtype='float32')
         while np.mean(mass) <= limit:
@@ -87,14 +100,14 @@ class StarCluster(object):
             mass[mindex] -= distance
 
         # Set Threshold Based On Average Modified By Deviation Reduced By Constant of Proportionality
-        threshold = np.mean(mass) - np.std(mass) / golden_ratio
+        threshold = np.mean(mass) - np.std(mass) * self.threshold_factor
 
         # Disconnect Lower Mass Nodes
         for i in range(n):
             if mass[i] <= threshold:
                 self.labels_[i] = -1
-        if upper:
-            uthreshold = np.mean(mass) + np.std(mass) / golden_ratio
+        if self.has_upper_cutoff:
+            uthreshold = np.mean(mass) + np.std(mass) * self.threshold_factor
             for i in range(n):
                 if mass[i] >= uthreshold:
                     self.ulabels[i] = -1
@@ -106,7 +119,7 @@ class StarCluster(object):
         while -1 in self.labels_:
             i = np.argmax(mass)
             mindex = i
-            if upper:
+            if self.has_upper_cutoff:
                 while self.labels_[mindex] == -1:
                     dsorted = np.argsort(distances_matrix[i])
                     not_connected = True
@@ -128,7 +141,7 @@ class StarCluster(object):
             self.labels_[i] = self.labels_[mindex]
             mass[i] = -np.inf
 
-        if upper:
+        if self.has_upper_cutoff and self.debug:
             print('Connections to nodes above upper mass threshold skipped: {}'.format(acount))
         return self
 
